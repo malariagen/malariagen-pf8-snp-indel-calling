@@ -1,0 +1,108 @@
+Bootstrap: docker
+From: broadinstitute/gatk:4.2.5.0
+
+%post
+    export DEBIAN_FRONTEND=noninteractive
+    export IRODS_VERSION=4.2.7
+    export BWA_VERSION=0.7.17
+    export BWA_DIR=bwa-${BWA_VERSION}
+    export SAMTOOLS_VER=1.13
+    export BCFTOOLS_VER=1.13
+    export BEDTOOLS_VER=2.30.0
+    export RTGTOOLS_VER=3.12.1
+
+    ### Base system
+
+    apt-get update -qq 
+    apt-get upgrade -qq -y
+    apt-get install -y --no-install-recommends \
+        software-properties-common \
+        dirmngr \
+        gpg-agent \
+        build-essential \
+        gcc \
+        zlib1g-dev  
+
+    ### R
+ 
+    # import the signing key (by Michael Rutter) for these repo
+    apt-key adv --no-pgp --keyserver keyserver.ubuntu.com --recv-keys E298A3A825C0D65DFD57CBB651716619E084DAB9
+    # add the R 4.0 repo from CRAN -- adjust 'focal' to 'groovy' or 'bionic' as needed
+    add-apt-repository "deb https://cran.r-project.org/bin/linux/ubuntu $(lsb_release -cs)-cran40/"
+    apt update -qq -y && apt-get upgrade -qq -y
+    # install R
+    apt-get install -y --no-install-recommends r-base
+    apt-get clean
+    rm -rf /var/lib/apt/lists/*
+    R -e "install.packages('ggplot2', repos='http://cran.rstudio.com/')"
+
+    cd /tmp
+    
+    ### iRODs
+    
+    wget -qO - https://packages.irods.org/irods-signing-key.asc | apt-key add -
+    echo "deb [arch=amd64] https://packages.irods.org/apt/ bionic main" | tee /etc/apt/sources.list.d/irods.list
+    apt update -qq -y && apt-get upgrade -qq -y
+    wget -c \
+        http://security.ubuntu.com/ubuntu/pool/main/p/python-urllib3/python-urllib3_1.22-1ubuntu0.18.04.2_all.deb \
+        http://security.ubuntu.com/ubuntu/pool/main/r/requests/python-requests_2.18.4-2ubuntu0.1_all.deb \
+        http://security.ubuntu.com/ubuntu/pool/main/o/openssl1.0/libssl1.0.0_1.0.2n-1ubuntu5.7_amd64.deb	
+    apt install -y \
+        ./python-urllib3_1.22-1ubuntu0.18.04.2_all.deb \
+        ./python-requests_2.18.4-2ubuntu0.1_all.deb \
+        ./libssl1.0.0_1.0.2n-1ubuntu5.7_amd64.deb 
+    rm -rf \
+        ./python-urllib3_1.22-1ubuntu0.18.04.2_all.deb \
+        ./python-requests_2.18.4-2ubuntu0.1_all.deb \
+        ./libssl1.0.0_1.0.2n-1ubuntu5.7_amd64.deb
+    apt install -y --no-install-recommends irods-runtime=${IRODS_VERSION} irods-icommands=${IRODS_VERSION} 
+
+    ###  BWA
+
+    wget -qO - https://github.com/lh3/bwa/releases/download/v${BWA_VERSION}/bwa-${BWA_VERSION}.tar.bz2 | tar -xj
+    cd ${BWA_DIR}
+    make install
+    cd .. 
+    rm -r ${BWA_DIR}
+
+    ### Samtools
+
+    apt-get install -y tabix libcurl4-openssl-dev gcc make libbz2-dev zlib1g-dev libncurses5-dev libncursesw5-dev liblzma-dev
+    wget  https://github.com/samtools/samtools/releases/download/${SAMTOOLS_VER}/samtools-${SAMTOOLS_VER}.tar.bz2
+    tar -vxjf samtools-${SAMTOOLS_VER}.tar.bz2
+    cd samtools-${SAMTOOLS_VER}
+    make install
+    cd ..
+
+    ### bcftools
+
+    wget https://github.com/samtools/bcftools/releases/download/${BCFTOOLS_VER}/bcftools-${BCFTOOLS_VER}.tar.bz2
+    tar -vxjf bcftools-${BCFTOOLS_VER}.tar.bz2
+    cd bcftools-${BCFTOOLS_VER}
+    make install
+    cd ..
+
+    ### bedtools
+
+    wget https://github.com/arq5x/bedtools2/releases/download/v${BEDTOOLS_VER}/bedtools-${BEDTOOLS_VER}.tar.gz
+    tar -zxvf bedtools-${BEDTOOLS_VER}.tar.gz
+    cd `find . -name 'bedtools*' -type d -maxdepth 1`
+    make install
+    cd ..
+
+    ### clean up
+
+    apt-get clean
+    rm -rf /var/lib/apt/lists/*
+    rm -rf /tmp/*
+
+%environment
+    export PATH=/opt:$PATH
+
+%test
+    which samtools
+    which bcftools
+    which R
+    which irods
+    which bedtools
+    which gatk
