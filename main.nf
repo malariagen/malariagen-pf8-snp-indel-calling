@@ -175,9 +175,6 @@ workflow generate_sample_gvcfs {
             .combine(sample_data)
             .map { it -> it.flatten() }
         
-        chromosomes_and_samples
-            | subscribe { it -> println "This is chromosomes and samples: ${it}"}
-        
         gatk_haplotype_caller(chromosomes_and_samples, reference_fa, reference_fai, reference_dict)
         
         gatk_haplotype_caller.out
